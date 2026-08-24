@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>光學透鏡成像模擬器 v2.1 - 真實光線對準版</title>
+  <title>光學透鏡成像模擬器 v2.2 - 終極修正版</title>
   <style>
     body { font-family: "微軟正黑體", sans-serif; text-align: center; background-color: #f4f4f9; }
     canvas { background-color: white; border: 2px solid #ccc; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -11,10 +11,10 @@
 </head>
 <body>
 
-  <h2>🔍 光學透鏡成像模擬器 (真實光線對準版)</h2>
+  <h2>🔍 光學透鏡成像模擬器 (終極修正版)</h2>
   
   <div class="controls">
-    <label>透鏡種類 (觀察畫布形狀)：</label>
+    <label>透鏡種類：</label>
     <select id="lensType" onchange="draw()">
       <option value="convex">凸透鏡 (會聚)</option>
       <option value="concave">凹透鏡 (發散)</option>
@@ -46,25 +46,20 @@
       const objX = cx - p;      // 物體X座標
       const objY = cy - objH;   // 物體頂端Y座標
 
-      // 1. 畫主軸與透鏡 (優化視覺與修正發散 Bug)
+      // 1. 畫主軸與透鏡形狀
       ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(800, cy); ctx.strokeStyle = "#ccc"; ctx.stroke();
       
-      // 在畫布上直接畫出透鏡形狀 (Goal 1 - 新增圖示功能)
       ctx.beginPath();
-      ctx.fillStyle = "rgba(0, 0, 0, 0.05)"; // 微弱的灰色，代表透鏡體
+      ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
       if (isConvex) {
-        // 凸透鏡幾何圖形
         ctx.ellipse(cx, cy, 25, 150, 0, 0, Math.PI * 2);
       } else {
-        // 凹透鏡幾何圖形
         ctx.moveTo(cx - 20, cy - 150); ctx.lineTo(cx + 20, cy - 150);
         ctx.bezierCurveTo(cx - 5, cy - 80, cx - 5, cy + 80, cx + 20, cy + 150);
         ctx.lineTo(cx - 20, cy + 150);
         ctx.bezierCurveTo(cx + 5, cy + 80, cx + 5, cy - 80, cx - 20, cy - 150);
       }
       ctx.fill();
-
-      // 畫中心軸線
       ctx.beginPath(); ctx.moveTo(cx, 50); ctx.lineTo(cx, 350); ctx.lineWidth = 1.5; ctx.strokeStyle = "#888"; ctx.stroke();
       ctx.lineWidth = 1;
 
@@ -77,47 +72,48 @@
       ctx.arc(cx - f_val*2, cy, 3, 0, Math.PI*2); ctx.arc(cx + f_val*2, cy, 3, 0, Math.PI*2);
       ctx.fill();
 
-      // 3. 計算像的位置與大小 (薄透鏡公式)
+      // 3. 計算像的位置與大小
       const q = (p * f) / (p - f); // 像距
       const mag = -q / p;          // 放大率
       const imgX = cx + q;
       const imgY = cy - (objH * mag);
 
-      // 4. 畫光線 (紅色：真實 / 虛線：假想) - **修正凹透鏡發散 Bug**
+      // 4. 畫光線 (修正線段長度)
       ctx.strokeStyle = "#ff4757"; ctx.lineWidth = 1.5;
       
       // === 光線 1：平行光 ===
       ctx.beginPath(); ctx.moveTo(objX, objY); ctx.lineTo(cx, objY); ctx.stroke();
       if (isConvex) {
-        // 凸透鏡：折射過右焦點
-        const farX = cx + 400; const farY = cy + (farX - cx) * ((cy - objY) / (cx - objX)); // 計算遠端Y軸
-        // 我們直接畫出標準路徑：從鏡心到右焦點的遠端
-        const m1 = (cy - objY) / f_val; // 斜率
-        ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(cx + 400, objY + 400 * m1); ctx.stroke();
-        // 虛像時，往回畫虛線
+        // 凸透鏡折射，讓線延伸到底 (x=800)
+        const endX = 800;
+        const endY = objY + ((endX - cx) / f_val) * (cy - objY);
+        ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(endX, endY); ctx.stroke();
+        
         if (q < 0) { ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(imgX, imgY); ctx.stroke(); ctx.setLineDash([]); }
       } else {
-        // === 凹透鏡：發散光線，沿著左焦點的方向 (修正 Bug!) ===
-        const m1_v = (objY - cy) / (cx - (cx - f_val)); // 斜率 (從左焦點方向看)
-        const farY = objY + 400 * m1_v; // 計算右邊遠端Y座標
-        
-        // 畫真實發散光線
-        ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(cx + 400, farY); ctx.stroke();
-        // 畫延長虛線過同側焦點 (F)
+        const m1_v = (objY - cy) / (cx - (cx - f_val));
+        const endX = 800;
+        const endY = objY + (endX - cx) * m1_v;
+        ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(endX, endY); ctx.stroke();
         ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(cx, objY); ctx.lineTo(cx - f_val, cy); ctx.stroke(); ctx.setLineDash([]);
       }
 
-      // === 光線 2：穿過鏡心的光 === (直线前进)
-      ctx.beginPath(); ctx.moveTo(objX, objY); ctx.lineTo(cx + (cx - objX)*1.5, cy + (cy - objY)*1.5); ctx.stroke();
-      // 穿鏡心光不需虛線延長，因它直接穿過像點 (針對凸透鏡虛像情境)
+      // === 光線 2：穿過鏡心的光 (修正長度) ===
+      // 計算從物件頂端穿過鏡心的斜率
+      const slope = (cy - objY) / (cx - objX);
+      const endX2 = 800; // 延伸到右邊邊界
+      const endY2 = cy + (endX2 - cx) * slope;
+      
+      ctx.beginPath(); ctx.moveTo(objX, objY); ctx.lineTo(endX2, endY2); ctx.stroke();
+      
       if (isConvex && q < 0) {
         ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(imgX, imgY); ctx.stroke(); ctx.setLineDash([]);
       }
       
       // 5. 畫出物體 (藍色箭頭)
       ctx.fillStyle = "#1e90ff";
-      ctx.fillRect(objX - 2, objY, 4, objH); // 箭頭身體
-      ctx.beginPath(); ctx.moveTo(objX, objY - 8); ctx.lineTo(objX - 6, objY); ctx.lineTo(objX + 6, objY); ctx.fill(); // 箭頭頂端
+      ctx.fillRect(objX - 2, objY, 4, objH);
+      ctx.beginPath(); ctx.moveTo(objX, objY - 8); ctx.lineTo(objX - 6, objY); ctx.lineTo(objX + 6, objY); ctx.fill();
 
       // 6. 畫出像 (橘色箭頭)
       ctx.fillStyle = "#ffa502";
@@ -126,9 +122,9 @@
       ctx.fillRect(imgX - 2, Math.min(cy, imgTopY), 4, Math.abs(objH * mag));
       ctx.beginPath();
       if (isReal) { 
-         ctx.moveTo(imgX, imgTopY + 8); ctx.lineTo(imgX - 6, imgTopY); ctx.lineTo(imgX + 6, imgTopY); // 倒立
+         ctx.moveTo(imgX, imgTopY + 8); ctx.lineTo(imgX - 6, imgTopY); ctx.lineTo(imgX + 6, imgTopY);
       } else { 
-         ctx.moveTo(imgX, imgTopY - 8); ctx.lineTo(imgX - 6, imgTopY); ctx.lineTo(imgX + 6, imgTopY); // 正立
+         ctx.moveTo(imgX, imgTopY - 8); ctx.lineTo(imgX - 6, imgTopY); ctx.lineTo(imgX + 6, imgTopY);
       }
       ctx.fill();
       
