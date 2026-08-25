@@ -53,12 +53,12 @@
   <canvas id="simCanvas" width="900" height="600"></canvas>
 
   <!-- 教育說明面板 -->
-  <div class="edu-panel">
-    <h3>👨‍🔬 實驗原理與觀察重點</h3>
-    <p><strong>1. 安培右手定則：</strong> 調整滑桿時，磁針距離導線愈遠，磁針偏轉減弱，此時「固定強度的地球磁場」會將磁針的N極(紅色)逐漸往北方偏轉。</p>
-    <p><strong>2. 磁針觀察：</strong> 畫面中 6 個放大的磁針剛好構成一個六邊形圓環，且距離導線愈遠，偏轉角度愈小。</p>
-    <p><strong>3. 鐵粉分佈：</strong> 切換至「鐵粉」並通電，可觀察到鐵粉受磁力影響，呈現「外疏內密」同心圓排列，可以看出距離導線愈近，磁場愈強。</p>
-  </div>
+  <div class="edu-panel">
+    <h3>👨‍🔬 實驗原理與觀察重點</h3>
+    <p><strong>1. 安培右手定則：</strong> 調整滑桿時，磁針距離導線愈遠，磁針偏轉減弱，此時「固定強度的地球磁場」會將磁針的N極(紅色)逐漸往北方偏轉。</p>
+    <p><strong>2. 磁針觀察：</strong> 畫面中 6 個放大的磁針剛好構成一個六邊形圓環，且距離導線愈遠，偏轉角度愈小。</p>
+    <p><strong>3. 鐵粉分佈：</strong> 切換至「鐵粉」並通電，可觀察到鐵粉受磁力影響，呈現「外疏內密」同心圓排列，可以看出距離導線愈近，磁場愈強。</p>
+  </div>
 </div>
 
 <script>
@@ -75,55 +75,59 @@
   
   // 鐵粉資料陣列 
   const ironFilings = [];
-  const numFilings = 2500; // 稍微增加鐵粉數量讓同心圓更明顯
+  const numFilings = 2500; 
   
-  // 初始化隨機鐵粉 (預先計算好通電前與通電後的位置，避免畫面閃爍)
+  // 初始化隨機鐵粉 (加入當下位置的記錄，以利動畫過渡)
   function initIronFilings() {
     ironFilings.length = 0;
-    const numRings = 12; // 設定同心圓的圈數
+    const numRings = 14; 
     
     for (let i = 0; i < numFilings; i++) {
-      // 1. 關閉時的位置 (完全隨機)
-      let offX = Math.random() * canvas.width;
-      let offY = Math.random() * canvas.height;
-      
-      // 2. 通電時的位置 (外疏內密的同心圓)
-      // 使用 Math.pow 讓內圈(數值小)的機率大幅提升
-      let ringIndex = Math.floor(Math.pow(Math.random(), 1.5) * numRings);
-      
-      // 設定軌道半徑：基礎距離 20，越外圈的間距越大 (ringIndex 平方)
+      // 1. 先決定通電後的「目標位置」
+      // 利用 Math.pow 讓機率大幅集中在內圈，達成你想要的「外疏內密」效果
+      let ringIndex = Math.floor(Math.pow(Math.random(), 1.6) * numRings);
       let baseRadius = 20 + (ringIndex * 15) + (ringIndex * ringIndex * 2.5);
       
-      // 加上隨機擾動(Jitter)，讓鐵粉不要排得像電腦畫的死板直線
-      let radius = baseRadius + (Math.random() - 0.5) * 20; 
-      let angle = Math.random() * Math.PI * 4;
+      let angle = Math.random() * Math.PI * 2;
       
-      let onX = cx + Math.cos(angle) * radius;
-      let onY = cy + Math.sin(angle) * radius;
+      // 給同心圓加上微小擾動，看起來更自然
+      let onRadius = baseRadius + (Math.random() - 0.5) * 8;
+      let onX = cx + Math.cos(angle) * onRadius;
+      let onY = cy + Math.sin(angle) * onRadius;
+
+      // 2. 決定斷電時的「初始位置」
+      // 讓鐵粉在目標位置附近 (半徑 35 像素內) 隨機打散
+      // 這樣通電時，鐵粉只會移動一小段距離，不會滿場飛！
+      let scatterDist = Math.random() * 35; 
+      let scatterAngle = Math.random() * Math.PI * 2;
+      let offX = onX + Math.cos(scatterAngle) * scatterDist;
+      let offY = onY + Math.sin(scatterAngle) * scatterDist;
       
       ironFilings.push({
         offX: offX,
         offY: offY,
         onX: onX,
         onY: onY,
+        currX: offX,
+        currY: offY,
         size: Math.random() * 1.5 + 0.5
       });
     }
   }
+  
   initIronFilings();
 
+  // 控制按鈕 (移除原本手動呼叫的 draw，交給動畫引擎處理)
   function setPower(state) {
     isPowered = state;
     document.getElementById('btnPowerOn').className = state ? 'active' : '';
     document.getElementById('btnPowerOff').className = !state ? 'active' : '';
-    draw();
   }
 
   function setDir(dir) {
     currentDir = dir;
     document.getElementById('btnDirUp').className = dir === 'up' ? 'active' : '';
     document.getElementById('btnDirDown').className = dir === 'down' ? 'active' : '';
-    draw();
   }
 
   function setMaterial(mat) {
@@ -131,13 +135,11 @@
     document.getElementById('btnMatCompass').className = mat === 'compass' ? 'active' : '';
     document.getElementById('btnMatIron').className = mat === 'iron' ? 'active' : '';
     document.getElementById('distControl').style.opacity = mat === 'compass' ? '1' : '0.3';
-    draw();
   }
 
   function updateDist() {
     compassDist = parseInt(document.getElementById('sliderDist').value);
     document.getElementById('distVal').innerText = compassDist;
-    if (material === 'compass') draw();
   }
 
   function drawCompass(x, y, angle) {
@@ -146,44 +148,18 @@
     ctx.rotate(angle);
     const size = 18; 
     
-    // N 極 (紅色)有錯，改成黑的 S
+    // N 極 (紅色)
     ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(-size/2.5, 0); ctx.lineTo(size/2.5, 0);
-    ctx.fillStyle = "#d7dbdb"; ctx.fill();
-    // S 極 (黑色)有錯，改成紅的 N
+    ctx.fillStyle = "#db3949"; ctx.fill();
+    // S 極 (灰色)
     ctx.beginPath(); ctx.moveTo(0, size); ctx.lineTo(-size/2.5, 0); ctx.lineTo(size/2.5, 0);
-    ctx.fillStyle = "#db3949"; ctx.fill(); ctx.strokeStyle = "#ccc"; ctx.stroke();
+    ctx.fillStyle = "#d7dbdb"; ctx.fill(); ctx.strokeStyle = "#ccc"; ctx.stroke();
     // 中心黑點
     ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI*2); ctx.fillStyle = "#333"; ctx.fill();
     ctx.restore();
-    ctx.save();
-    // 設定圖示位置 (右上角)
-    const earthIconX = canvas.width - 60;
-    const earthIconY = 40;
-    
-    // 畫箭頭主幹 (指向上方)
-    ctx.beginPath();
-    ctx.moveTo(earthIconX, earthIconY + 20);
-    ctx.lineTo(earthIconX, earthIconY - 20);
-    ctx.strokeStyle = "#0ea5e9"; // 使用顯眼的藍色
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // 畫箭頭頂部的三角形
-    ctx.beginPath();
-    ctx.moveTo(earthIconX, earthIconY - 22);
-    ctx.lineTo(earthIconX - 7, earthIconY - 8);
-    ctx.lineTo(earthIconX + 7, earthIconY - 8);
-    ctx.fillStyle = "#0ea5e9";
-    ctx.fill();
-
-    // 加上文字標示
-    ctx.font = "bold 14px 微軟正黑體";
-    ctx.fillStyle = "#333";
-    ctx.textAlign = "center";
-    ctx.fillText("北方", earthIconX, earthIconY + 40);
-    ctx.restore();
   }
 
+  // 繪圖核心與動畫迴圈
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -197,12 +173,17 @@
       ctx.fillStyle = "#333";
       for (let i = 0; i < numFilings; i++) {
         let p = ironFilings[i];
-        // 根據通電狀態，決定讀取 offX 還是 onX 的位置
-        let drawX = isPowered ? p.onX : p.offX;
-        let drawY = isPowered ? p.onY : p.offY;
+        
+        // 決定目標位置
+        let targetX = isPowered ? p.onX : p.offX;
+        let targetY = isPowered ? p.onY : p.offY;
+        
+        // 【動畫平滑過渡】：利用 Lerp 讓當前位置緩慢逼近目標位置
+        p.currX += (targetX - p.currX) * 0.05;
+        p.currY += (targetY - p.currY) * 0.05;
         
         ctx.beginPath();
-        ctx.arc(drawX, drawY, p.size, 0, Math.PI * 2);
+        ctx.arc(p.currX, p.currY, p.size, 0, Math.PI * 2);
         ctx.fill();
       }
     } else {
@@ -219,28 +200,37 @@
         let finalAngle = 0; 
         
         if (isPowered) {
-           const bEarthX = 0;
-           const bEarthY = -15; 
+           const bEarthX = 0; 
+           // 引入動態視覺平滑技巧：距離越遠，地磁越強
+           const bEarthY = -25 * (compassDist / 250); 
            
            const bWireMag = 3000 / compassDist; 
            
            let tangentDirX, tangentDirY;
+           
+           // 調整為符合 Canvas 座標系 (Y軸向下) 的向量算法
            if (currentDir === 'up') { 
-             tangentDirX = -Math.sin(theta);
-             tangentDirY = Math.cos(theta);
-           } else { 
              tangentDirX = Math.sin(theta);
              tangentDirY = -Math.cos(theta);
+           } else { 
+             tangentDirX = -Math.sin(theta);
+             tangentDirY = Math.cos(theta);
            }
            
            const bWireX = tangentDirX * bWireMag;
            const bWireY = tangentDirY * bWireMag;
            
-           const netX = bEarthX + bWireX;
-           const netY = bEarthY + bWireY;
+           // 維持向外的平滑翻轉推力 (確保奇異點平滑過渡)
+           const radialBias = compassDist * 0.015; 
+           const biasX = Math.cos(theta) * radialBias;
+           const biasY = Math.sin(theta) * radialBias;
+           
+           const netX = bEarthX + bWireX + biasX;
+           const netY = bEarthY + bWireY + biasY;
            
            finalAngle = Math.atan2(netY, netX) + Math.PI/2; 
         }
+        
         drawCompass(pX, pY, finalAngle);
       }
     }
@@ -262,8 +252,37 @@
       ctx.beginPath(); ctx.moveTo(cx - 6, cy - 6); ctx.lineTo(cx + 6, cy + 6); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx + 6, cy - 6); ctx.lineTo(cx - 6, cy + 6); ctx.stroke();
     }
+
+    // 地磁圖示 (統一在右上角繪製一次)
+    ctx.save();
+    const earthIconX = canvas.width - 60;
+    const earthIconY = 40;
+    
+    ctx.beginPath();
+    ctx.moveTo(earthIconX, earthIconY + 20);
+    ctx.lineTo(earthIconX, earthIconY - 20);
+    ctx.strokeStyle = "#0ea5e9"; 
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(earthIconX, earthIconY - 22);
+    ctx.lineTo(earthIconX - 7, earthIconY - 8);
+    ctx.lineTo(earthIconX + 7, earthIconY - 8);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fill();
+
+    ctx.font = "bold 18px 微軟正黑體";
+    ctx.fillStyle = "#333";
+    ctx.textAlign = "center";
+    ctx.fillText("北方", earthIconX, earthIconY + 40);
+    ctx.restore();
+
+    // 啟動動畫引擎，不斷循環渲染
+    requestAnimationFrame(draw);
   }
 
+  // 初始呼叫，正式啟動整套程式
   draw();
 </script>
 </body>
